@@ -11,50 +11,48 @@ client = discord.Client(intents=intents)
 
 token = os.getenv("DISCORD_TOKEN")
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-model_engine = "gpt-4o"
+model_engine = "gpt-3.5-turbo"
 
 @client.event
 async def on_ready():
-  print(f'We have logged in as {client.user}')
+    print(f'We have logged in as {client.user}')
 
 @client.event
-async def on_message():
-  global model_engine
-  if message.author.bot:
-    return
-  if message.author == client.user:
-    return
-  
+async def on_message(message):
+    global model_engine
+    if message.author.bot:
+        return
+    if message.author == client.user:
+        return
     if client.user in message.mentions:
-                #botに話しかけて待機中に表示されるメッセージ
+        print(f"Received message: {message.content}")
         msg = await message.reply("少々お待ちください..", mention_author=False)
         try:
-            prompt = message.content.replace('1239748545612091464', '')
+            prompt = message.content.replace(f'@{client.user.name}', '').strip()
             if not prompt:
                 await msg.delete()
                 await message.channel.send("質問内容がありません")
                 return
+            thread = await message.create_thread(name=f"{message.author.name}の質問")
             completion = openai.ChatCompletion.create(
-            model=model_engine,
-            messages=[
-                {
-                    "role": "system",
-                    #↓この命令を一文書くことですべての会話に犬っぽく返してくれるようになる
-                    "content": "日本語で返答してください。"
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],)
-
+                model=model_engine,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "日本語で返答してください。"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+            )
             response = completion["choices"][0]["message"]["content"]
+            print(f"OpenAI API response: {response}")
             await msg.delete()
-            await message.reply(response, mention_author=False)
-        except:
-            import traceback
-            traceback.print_exc()
-            await message.reply("エラーです", mention_author=False)
+            await thread.send(response)
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            await message.reply("エラーが発生しました", mention_author=False)
 
 client.run(token)
